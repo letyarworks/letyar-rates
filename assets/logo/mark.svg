@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Letyar mark">
+  <g fill="none" stroke="#16130F" stroke-width="7" stroke-linecap="round">
+    <path d="M 18 16 V 48 A 34 34 0 0 0 52 82 H 82"/>
+    <path d="M 30 16 V 48 A 22 22 0 0 0 52 70 H 82"/>
+    <path d="M 42 16 V 48 A 10 10 0 0 0 52 58 H 82"/>
+  </g>
+  <circle cx="52" cy="48" r="4.5" fill="#B23A22"/>
+</svg>
