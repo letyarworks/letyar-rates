@@ -10,35 +10,18 @@ class RateService {
       'https://xaus.com/api/v1/spot?currency=USD&unit=gram&compact=1';
 
   Future<RateData> fetchRates() async {
-    final responses = await Future.wait([
-      http
-          .get(Uri.parse(_currencyUrl))
-          .timeout(const Duration(seconds: 10)),
-      http
-          .get(Uri.parse(_goldUrl))
-          .timeout(const Duration(seconds: 10)),
-    ]);
-
-    final currencyResponse = responses[0];
-    final goldResponse = responses[1];
+    final currencyResponse = await http
+        .get(Uri.parse(_currencyUrl))
+        .timeout(const Duration(seconds: 10));
 
     if (currencyResponse.statusCode != 200) {
       throw Exception('Failed to load currency rates');
     }
 
-    if (goldResponse.statusCode != 200) {
-      throw Exception('Failed to load gold rate');
-    }
-
     final currencyDecoded = jsonDecode(currencyResponse.body);
-    final goldDecoded = jsonDecode(goldResponse.body);
 
     if (currencyDecoded is! Map<String, dynamic>) {
       throw Exception('Invalid currency API response');
-    }
-
-    if (goldDecoded is! Map<String, dynamic>) {
-      throw Exception('Invalid gold API response');
     }
 
     final data = currencyDecoded['data'];
@@ -68,37 +51,44 @@ class RateService {
       throw Exception('Invalid USD rate');
     }
 
-    final gold = goldDecoded['xau'];
+    final now = DateTime.now();
+    GoldRate? goldRate;
 
-    if (gold is! Map<String, dynamic>) {
-      throw Exception('Gold data not found');
+    try {
+      final goldResponse = await http
+          .get(Uri.parse(_goldUrl))
+          .timeout(const Duration(seconds: 10));
+
+      if (goldResponse.statusCode == 200) {
+        final goldDecoded = jsonDecode(goldResponse.body);
+
+        if (goldDecoded is Map<String, dynamic>) {
+          final gold = goldDecoded['xau'];
+          final goldUsdGram = gold is Map<String, dynamic>
+              ? _toDouble(gold['price'])
+              : null;
+
+          if (goldUsdGram != null) {
+            goldRate = GoldRate(
+              usdPerGram: goldUsdGram,
+              buy: goldUsdGram * usdBuy,
+              sell: goldUsdGram * usdSell,
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // USD must remain available even if the gold service is unavailable.
     }
-
-    final goldUsdGram = _toDouble(gold['price']);
-
-    if (goldUsdGram == null) {
-      throw Exception('Invalid gold rate');
-    }
-
-    final goldBuy = goldUsdGram * usdBuy;
-    final goldSell = goldUsdGram * usdSell;
-
-    final updatedAt = DateTime.tryParse(
-      goldDecoded['updated_at']?.toString() ?? '',
-    );
 
     return RateData(
       usd: UsdRate(
         buy: usdBuy,
         sell: usdSell,
-        updatedAt: updatedAt ?? DateTime.now(),
+        updatedAt: now,
       ),
-      gold: GoldRate(
-        usdPerGram: goldUsdGram,
-        buy: goldBuy,
-        sell: goldSell,
-      ),
-      updatedAt: updatedAt ?? DateTime.now(),
+      gold: goldRate,
+      updatedAt: now,
     );
   }
 
@@ -120,7 +110,7 @@ class RateService {
 
 class RateData {
   final UsdRate usd;
-  final GoldRate gold;
+  final GoldRate? gold;
   final DateTime updatedAt;
 
   const RateData({
